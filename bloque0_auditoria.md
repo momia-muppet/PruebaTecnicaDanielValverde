@@ -1,6 +1,6 @@
 # Bloque 0 — Auditoría de Calidad de Datos
 
-> Prompt de IA usado: *"Carga los 6 CSV con pandas y para cada dimensión de calidad (completitud, consistencia, unicidad, validez, integridad referencial, frescura, integridad temporal, integridad del A/B test) calcula el hallazgo con evidencia numérica: conteos, ejemplos y % afectado."* Yo definí las reglas de negocio de cada chequeo y las decisiones; la IA generó el código de cálculo, que validé revisando manualmente los ejemplos devueltos (filas concretas, no solo agregados).
+> Prompt de IA usado: *"Carga los 6 CSV con pandas y para cada dimensión de calidad (completitud, consistencia, unicidad, validez, integridad referencial, frescura, integridad temporal, integridad del A/B test) calcula el hallazgo con evidencia numérica: conteos, ejemplos y % afectado."* Yo definí las reglas de negocio de cada chequeo y las decisiones; la IA generó el código de cálculo, que validé revisando manualmente los ejemplos devueltos.
 
 ---
 
@@ -39,7 +39,7 @@ Es perfectamente consistente con `loyalty_card`: el cruce es 1:1 exacto —
 
 **Decisión:**
 - Las 3 transacciones de $0 se excluyen de KPIs de GMV/ticket promedio pero se dejan en el conteo de tráfico/transacciones (podrían ser canjes 100% con puntos).
-- `ITEM_089` se marca para excluir de análisis de precio/margen hasta confirmar con el equipo de producto si es un ítem promocional mal etiquetado (`was_on_promo` debería ser `True`) o un error de carga de precio.
+- `ITEM_089` (precio unitario, no total_amount) se marca para excluir de análisis de precio/margen hasta confirmar con el equipo de producto si es un ítem promocional mal etiquetado (`was_on_promo` debería ser `True`) o un error de carga de precio — el hecho de que sea un único SKU y no ruido disperso apunta más a un error sistemático de carga que a 231 casos aislados.
 
 ---
 
@@ -51,7 +51,7 @@ Es perfectamente consistente con `loyalty_card`: el cruce es 1:1 exacto —
 - `store_promotions.store_id` → `stores`: **0 huérfanos**.
 - `products.vendor_id` → `vendors`: **5 huérfanos** (`ITEM_045`, `ITEM_078`, `ITEM_112`, `ITEM_156`, `ITEM_189`) — referencian un `vendor_id` que no existe en `vendors.csv`.
 
-**Decisión:** Estos 5 productos se mantienen en el análisis de ventas (GMV, unidades), pero se excluyen de cualquier análisis por proveedor (GMROI Query 4, dashboards de vendor) marcándolos como `VENDOR_DESCONOCIDO`, para no perder GMV real pero tampoco inventar un proveedor.
+**Decisión:** Se recomienda primero validar con el equipo de datos si es un error de extracción (ETL que truncó o desincronizó `vendors.csv`) o un vendor real dado de baja del maestro. Mientras se confirma, estos 5 productos se mantienen en el análisis de ventas (GMV, unidades), pero se excluyen de cualquier análisis por proveedor (GMROI Query 4). En el dashboard (Power BI) se les asigna la categoría `"Vendedor Desconocido"` en vez de excluirlos, para no perder GMV real ni ocultar el problema de calidad al usuario del reporte.
 
 ---
 
@@ -69,7 +69,7 @@ Este gap coincide con el arranque del experimento de exhibición (`Exhibicion_Q3
 
 **Hallazgo:** 50 transacciones en **TIENDA_037** ocurren *antes* de su `opening_date` (2024‑06‑01) — las transacciones más tempranas son del 2024‑05‑15, es decir, hasta 17 días antes de la apertura oficial.
 
-**Decisión:** Se excluyen estas 50 transacciones de cualquier análisis que dependa de `opening_date` (Comp Sales, antigüedad de tienda) y se marcan como alerta de calidad — probablemente una apertura "soft" no reflejada en el campo `opening_date`, o un error de carga de la fecha de apertura.
+**Decisión:** Se excluyen estas 50 transacciones de cualquier análisis que dependa de `opening_date` (Comp Sales, antigüedad de tienda) y se marcan como alerta de calidad. Hipótesis a validar con el negocio: (a) apertura "soft"/preventa a empleados o clientes VIP antes de la inauguración oficial (práctica común en retail), en cuyo caso el dato es correcto y lo que está mal es `opening_date`; o (b) error de carga de la fecha de apertura en el maestro de tiendas. Se recomienda confirmar con la tienda antes de decidir cuál de las dos correcciones aplicar.
 
 ---
 
